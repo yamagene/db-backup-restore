@@ -1,4 +1,9 @@
 {
+  "name": "db-backup-restore",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "",
+  "main": "main.js",
   "dependencies": {
     "@inquirer/prompts": "^7.7.1",
     "child_process": "^1.0.2",

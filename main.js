@@ -2,6 +2,7 @@ import { input, select } from "@inquirer/prompts";
 import { getFullYear } from "./utils/getFullYear.js";
 import { exec } from "child_process";
 import { promisify } from "util";
+import { dbEnvironments } from "./dbEnvironment.js";
 import "dotenv/config";
 
 //以下、postgresを対象に実装する
