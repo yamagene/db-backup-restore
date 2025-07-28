@@ -13,7 +13,7 @@ async function dumpDatabase(host, dbName) {
   try {
     const filePath =
       process.env.ROOT_PATH + `${getFullYear()}_${dbName}.backup`;
-    const command = `sudo pg_dump -Fc -h ${host} -U postgres -C ${dbName} -f ${filePath}`;
+    const command = `pg_dump -Fc -C -h ${host} -U postgres -d ${dbName} -f ${filePath}`;
     const { stdout, stderr } = await execAsync(command);
 
     console.log("バックアップ完了:", stdout);
@@ -31,7 +31,7 @@ async function restoreDatabase(host, filePath) {
   try {
     //リストア前にDBが存在していないため、DB名の指定はしない。
     //-C：DB作成オプション
-    const command = `sudo pg_restore -h ${host} -p 5432 -U postgres -C -d postgres ${filePath}`;
+    const command = `pg_restore -C -h ${host} -p 5432 -U postgres -d postgres ${filePath}`;
     const { stdout, stderr } = await execAsync(command);
 
     console.log("リストア完了:", stdout);
@@ -56,7 +56,7 @@ const backupOperation = async () => {
 
   //バックアップコマンドの実行
   const filePath = await dumpDatabase(dbEnvironment, dbName);
-  (await filePath) != null
+  filePath != null
     ? console.log("ファイルが出力されました：", filePath)
     : console.log("ファイルの出力に失敗しました");
 };
@@ -79,7 +79,7 @@ const backupandrestoreOperation = async () => {
   });
   //バックアップ、リストアを実行
   const filePath = await dumpDatabase(dbEnvironmentForBackup, dbName);
-  await restoreDatabase(dbEnvironmentForRestore, dbName, filePath);
+  await restoreDatabase(dbEnvironmentForRestore, filePath);
 };
 
 //「バックアップファイルを取得する」、「DBを特定の環境にリストアする」の選択肢から選ぶ
@@ -100,9 +100,9 @@ const selectedOperation = await select({
 //操作の分岐
 switch (selectedOperation) {
   case "backup":
-    backupOperation();
+    await backupOperation();
     break;
   case "backupandrestore":
-    backupandrestoreOperation();
+    await backupandrestoreOperation();
     break;
 }
