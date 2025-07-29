@@ -8,9 +8,29 @@ import "dotenv/config";
 //以下、postgresを対象に実装する
 
 const execAsync = promisify(exec);
+
+//データベースの存在確認
+async function checkIsExistDatabase(host, dbName) {
+  //DB存在チェック
+  //pg_database：メタデータを格納するテーブル
+  const checkCommand = `psql -h ${host} -p 5432 -U postgres -tAc "SELECT 1 FROM pg_database WHERE datname='${dbName}'"`;
+  const { stdout: checkResult } = await execAsync(checkCommand);
+
+  if (checkResult.trim() === "1") {
+    return true;
+  }
+
+  return false;
+}
 //バックアップを実行
 async function dumpDatabase(host, dbName) {
   try {
+    //DB存在チェック
+    if (!(await checkIsExistDatabase(host, dbName))) {
+      console.log(`データベース${dbName}は存在していません`);
+      return null;
+    }
+
     const filePath =
       process.env.ROOT_PATH + `${getFullYear()}_${dbName}.backup`;
     const command = `pg_dump -Fc -C -h ${host} -U postgres -d ${dbName} -f ${filePath}`;
@@ -27,15 +47,21 @@ async function dumpDatabase(host, dbName) {
 }
 
 //リストアを実行
-async function restoreDatabase(host, filePath) {
+async function restoreDatabase(host, dbName, filePath) {
   try {
-    //リストア前にDBが存在していないため、DB名の指定はしない。
-    //-C：DB作成オプション
-    const command = `pg_restore -C -h ${host} -p 5432 -U postgres -d postgres ${filePath}`;
-    const { stdout, stderr } = await execAsync(command);
+    //DB存在チェック
+    if (await checkIsExistDatabase(host, dbName)) {
+      console.log(`データベース '${dbName}' は既に存在しています`);
+      console.log(`処理を中止します`);
+    } else {
+      //リストア前にDBが存在していないため、DB名の指定はしない。
+      //-C：DB作成オプション
+      const command = `pg_restore -C -h ${host} -p 5432 -U postgres -d postgres ${filePath}`;
+      const { stdout, stderr } = await execAsync(command);
 
-    console.log("リストア完了:", stdout);
-    if (stderr) console.log("警告:", stderr);
+      console.log("リストア完了:", stdout);
+      if (stderr) console.log("警告:", stderr);
+    }
   } catch (e) {
     console.log(e);
   }
@@ -68,10 +94,10 @@ const backupandrestoreOperation = async () => {
     message: "どの環境のDBのバックアップを取得しますか？",
     choices: dbEnvironments,
   });
-  //リストア先の環境「localhost」「db02_work」「db02_stage」「gis05」「gis06」
+  //リストア先の環境はバックアップを取得した環境以外から選ぶ
   const dbEnvironmentForRestore = await select({
     message: "どの環境にDBをリストアしますか？",
-    choices: dbEnvironments,
+    choices: dbEnvironments.filter((el) => el.value !== dbEnvironmentForBackup),
   });
   //DB名を入力
   const dbName = await input({
@@ -79,7 +105,9 @@ const backupandrestoreOperation = async () => {
   });
   //バックアップ、リストアを実行
   const filePath = await dumpDatabase(dbEnvironmentForBackup, dbName);
-  await restoreDatabase(dbEnvironmentForRestore, filePath);
+  if (filePath) {
+    await restoreDatabase(dbEnvironmentForRestore, dbName, filePath);
+  }
 };
 
 //「バックアップファイルを取得する」、「DBを特定の環境にリストアする」の選択肢から選ぶ
